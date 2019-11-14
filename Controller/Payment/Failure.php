@@ -2,7 +2,11 @@
 
 namespace Natso\Piraeus\Controller\Payment;
 
-class Failure extends \Magento\Framework\App\Action\Action
+use Magento\Framework\App\CsrfAwareActionInterface;
+use Magento\Framework\App\Request\InvalidRequestException;
+use Magento\Framework\App\RequestInterface;
+
+class Failure extends \Magento\Framework\App\Action\Action implements CsrfAwareActionInterface
 {
     public $context;
     protected $_order;
@@ -16,10 +20,21 @@ class Failure extends \Magento\Framework\App\Action\Action
         parent::__construct($context);
     }
 
+    public function createCsrfValidationException(
+    RequestInterface $request 
+    ): ?InvalidRequestException {
+    return null;
+    }
+   
+    public function validateForCsrf(RequestInterface $request): ?bool
+    {
+        return true;
+    }
+
     public function execute()
     {
         try {
-            $postData = $this->getRequest()->getPost();
+            $postData = $this->getRequest()->getPostValue();
             if (!empty($postData) && isset($postData['MerchantReference'])) {
                 $this->_order->loadByIncrementId($postData['MerchantReference']);
                 $this->_order->setState(\Magento\Sales\Model\Order::STATE_CANCELED, true);

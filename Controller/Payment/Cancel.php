@@ -2,7 +2,11 @@
 
 namespace Natso\Piraeus\Controller\Payment;
 
-class Cancel extends \Magento\Framework\App\Action\Action
+use Magento\Framework\App\CsrfAwareActionInterface;
+use Magento\Framework\App\Request\InvalidRequestException;
+use Magento\Framework\App\RequestInterface;
+
+class Cancel extends \Magento\Framework\App\Action\Action implements CsrfAwareActionInterface
 {
     public $context;
     protected $_order;
@@ -17,6 +21,17 @@ class Cancel extends \Magento\Framework\App\Action\Action
         $this->_order    = $_order;
         $this->_onepage = $_onepage;
         parent::__construct($context);
+    }
+
+    public function createCsrfValidationException(
+    RequestInterface $request 
+    ): ?InvalidRequestException {
+    return null;
+    }
+   
+    public function validateForCsrf(RequestInterface $request): ?bool
+    {
+        return true;
     }
 
     public function execute()
