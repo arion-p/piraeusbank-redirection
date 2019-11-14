@@ -1,4 +1,4 @@
-# Τράπεζα Πειραιώς Redirection#
+# Τράπεζα Πειραιώς Redirection
 
 Referrer URL: {{domain}}/winbank/payment/redirect/
 
