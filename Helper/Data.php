@@ -5,16 +5,22 @@ namespace Natso\Piraeus\Helper;
 class Data extends \Magento\Framework\App\Helper\AbstractHelper
 {
     public $scopeConfig;
+    public $checkoutSession;
+    public $orderRepository;
     public $order;
     public $cart;
     protected $_objectManager;
 
     public function __construct(
         \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
+        \Magento\Checkout\Model\Session $checkoutSession,
+        //\Magento\Sales\Api\OrderRepositoryInterface $orderRepository,
         \Magento\Sales\Api\Data\OrderInterface $order,
         \Magento\Checkout\Model\Cart $cart,
         \Magento\Framework\ObjectManagerInterface $_objectManager
     ) {
+        $this->checkoutSession = $checkoutSession;
+        //$this->orderRepository  = $orderRepository;
         $this->order            = $order;
         $this->cart             = $cart;
         $this->scopeConfig      = $scopeConfig;
@@ -23,9 +29,12 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 
     public function getTicketData()
     {
-        $checkout = $this->_objectManager->get('Magento\Checkout\Model\Type\Onepage')->getCheckout();
-
-        $this->order->loadByIncrementId($checkout->getLastRealOrderId());
+        //$checkout = $this->_objectManager->get('Magento\Checkout\Model\Type\Onepage')->getCheckout();
+        //$this->order->loadByIncrementId($checkout->getLastRealOrderId());
+        
+        //$this->order->loadByIncrementId($this->checkoutSession->getLastRealOrderId());
+        //$order = $this->order;
+        $order = $this->checkoutSession->getLastRealOrder();
 
         $acquirerId = $this->scopeConfig->getValue(
             'payment/piraeus/acquirer_id',
@@ -62,7 +71,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             \Magento\Store\Model\ScopeInterface::SCOPE_STORE
         );
 
-        $ai = $this->order->getPayment()->getAdditionalInformation();
+        $ai = $order->getPayment()->getAdditionalInformation();
 
         if ( isset($ai['installments']) ) {
             $orderInstallments = $ai['installments'];
@@ -78,8 +87,8 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             'Password'          => hash('md5', $password),
             'RequestType'       => $requestType,
             'CurrencyCode'      => '978',
-            'MerchantReference' => $checkout->getLastRealOrderId(),
-            'Amount'            => round($this->order->getData('base_grand_total'), 2),
+            'MerchantReference' => $this->checkoutSession->getLastRealOrderId(),
+            'Amount'            => round($order->getData('base_grand_total'), 2),
             'Installments'      => $orderInstallments,
             'ExpirePreauth'     => $expirePreauth,
             'Bnpl'              => '',
@@ -91,7 +100,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 
     public function getPostData()
     {
-        $checkout = $this->_objectManager->get('Magento\Checkout\Model\Type\Onepage')->getCheckout();
+        //$checkout = $this->_objectManager->get('Magento\Checkout\Model\Type\Onepage')->getCheckout();
 
         $acquirerId = $this->scopeConfig->getValue(
             'payment/piraeus/acquirer_id',
@@ -118,7 +127,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
             'MerchantId'        => $merchantId,
             'PosId'             => $posId,
             'User'              => $username,
-            'MerchantReference' => $checkout->getLastRealOrderId(),
+            'MerchantReference' => $this->checkoutSession->getLastRealOrderId(),
             'LanguageCode'      => 'el-GR',
             'Parameters'        => ''
         );
@@ -138,7 +147,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         $available = array();
         $installments = $this->getInstallments();
         $bgt = $this->cart->getQuote()->getData('base_grand_total');
-        $installments = explode(";",$installments);
+        $installments = $installments? explode(";", $installments) : [];
         foreach ($installments as $inst) {
             $inst = explode(":",$inst);
             if ($inst[0] <= $bgt) {

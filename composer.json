@@ -1,7 +1,8 @@
 {
     "name": "natso/module-piraeus",
+    "type": "magento2-module",
     "description": "",
-    "license": "proprietary",
+    "license": "MIT",
     "authors": [
         {
             "email": "natso@natso.gr",

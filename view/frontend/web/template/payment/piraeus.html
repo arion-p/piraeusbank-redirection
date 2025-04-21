@@ -22,7 +22,7 @@
         </div>
         <div class="fieldset">
             <div class="field">
-                <label class="label"><span data-bind="i18n: 'Installments'"></span></label>
+                <label class="label"><span data-bind="i18n: 'Installments', visible: hasInstallments()"></span></label>
                 <div class="control">
                     <select data-bind="
                       visible: hasInstallments(),
