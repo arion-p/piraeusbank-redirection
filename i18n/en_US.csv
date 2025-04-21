@@ -1,0 +1,19 @@
+"Payment canceled by user.","Payment canceled by user."
+"Error: ","Error: "
+Invoiced,Invoiced
+Installments,Installments
+"Winbank Redirect","Winbank Redirect"
+Enable,Enable
+Title,Title
+"Request Type","Request Type"
+"Sale: 02 , Autorization: 00","Sale: 02 , Autorization: 00"
+"Expire Preauth","Expire Preauth"
+"If Request Type is02 this must be 00","If Request Type is02 this must be 00"
+"Acquirer ID","Acquirer ID"
+"Merchant ID","Merchant ID"
+Username,Username
+Password,Password
+"Pos ID","Pos ID"
+"New Order Status","New Order Status"
+"Ticket Url","Ticket Url"
+"Post Url","Post Url"
