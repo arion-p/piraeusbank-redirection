@@ -18,25 +18,19 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
 
     public $scopeConfig;
     public $checkoutSession;
-    public $orderRepository;
-    public $order;
-    public $cart;
-    protected $_objectManager;
+    public $quote;
+    public $logger;
 
     public function __construct(
         \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
         \Magento\Checkout\Model\Session $checkoutSession,
-        //\Magento\Sales\Api\OrderRepositoryInterface $orderRepository,
-        \Magento\Sales\Api\Data\OrderInterface $order,
-        \Magento\Checkout\Model\Cart $cart,
-        \Magento\Framework\ObjectManagerInterface $_objectManager
+        \Magento\Quote\Model\Quote $quote,
+        \Psr\Log\LoggerInterface $logger,
     ) {
         $this->checkoutSession = $checkoutSession;
-        //$this->orderRepository  = $orderRepository;
-        $this->order            = $order;
-        $this->cart             = $cart;
+        $this->quote            = $quote;
         $this->scopeConfig      = $scopeConfig;
-        $this->_objectManager   = $_objectManager;
+        $this->logger           = $logger;
     }
 
     public function getTicketData()
@@ -166,6 +160,44 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
         return $postData;
     }
 
+    public function isValidResponse($order, $postData)
+    {
+        $additionalInfo = $order->getPayment()->getAdditionalInformation();
+        $ticket = $additionalInfo['ticket'] ?? null;
+        if (!$ticket) {
+            $this->logger->error('Piraeus Bank: No ticket found in order.');
+            return false;
+        }
+
+        $data = [];
+        $data[] = $ticket;
+        $data[] = $this->scopeConfig->getValue(
+            self::CONFIG_PATH_POS_ID,
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+        );
+        $data[] = $this->scopeConfig->getValue(
+            self::CONFIG_PATH_ACQUIRER_ID,
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+        );
+        $data[] = $postData['MerchantReference'];
+        $data[] = $postData['ApprovalCode'];
+        $data[] = $postData['Parameters'];
+        $data[] = $postData['ResponseCode'];
+        $data[] = $postData['SupportReferenceID'];
+        $data[] = $postData['AuthStatus'];
+        $data[] = $postData['PackageNo'];
+        $data[] = $postData['StatusFlag'];
+
+        $hasKey = strtoupper(hash_hmac('sha256', implode(';', $data), $ticket));
+
+        if ($postData['HashKey'] == $hasKey) {
+            return true;
+        } else {
+            $this->logger->error('Piraeus Bank: Invalid response hash key. Expected: ' . $hasKey . ' - Received: ' . $postData['HashKey']);
+            return false;
+        }
+    }
+
     public function getInstallments()
     {
         return $this->scopeConfig->getValue(
@@ -177,7 +209,7 @@ class Data extends \Magento\Framework\App\Helper\AbstractHelper
     public function getAvailableInstallments() {
         $available = array();
         $installments = $this->getInstallments();
-        $bgt = $this->cart->getQuote()->getData('base_grand_total');
+        $bgt = $this->quote->getData('base_grand_total');
         $installments = $installments? explode(";", $installments) : [];
         foreach ($installments as $inst) {
             $inst = explode(":",$inst);

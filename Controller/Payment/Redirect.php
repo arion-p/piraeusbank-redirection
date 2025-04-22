@@ -7,6 +7,7 @@ class Redirect extends \Magento\Framework\App\Action\Action
     protected $resultPageFactory;
     protected $checkoutSession;
     protected $soapClientFactory;
+    protected $orderRepository;
     protected $messageManager;
     protected $_helper;
     protected $logger;
@@ -16,6 +17,7 @@ class Redirect extends \Magento\Framework\App\Action\Action
         \Magento\Framework\View\Result\PageFactory $resultPageFactory,
         \Magento\Checkout\Model\Session $checkoutSession,
         \Magento\Framework\Webapi\Soap\ClientFactory $soapClientFactory,
+        \Magento\Sales\Api\OrderRepositoryInterface $orderRepository,
         \Magento\Framework\Message\ManagerInterface $messageManager,
         \Natso\Piraeus\Helper\Data $_helper,
         \Psr\Log\LoggerInterface $logger,
@@ -23,6 +25,7 @@ class Redirect extends \Magento\Framework\App\Action\Action
         $this->resultPageFactory = $resultPageFactory;
         $this->checkoutSession = $checkoutSession;
         $this->soapClientFactory = $soapClientFactory;
+        $this->orderRepository = $orderRepository;
         $this->messageManager = $messageManager;
         $this->_helper = $_helper;
         $this->logger = $logger;
@@ -48,9 +51,9 @@ class Redirect extends \Magento\Framework\App\Action\Action
             $this->logger->debug(print_r($response, true));
 
             if ($response->ResultCode == 0) {
-                $this->checkoutSession->setPiraeusBankTicket($response);
+                $this->setTicket($response->TranTicket);
             } else {
-                $this->checkoutSession->unsPiraeusBankTicket();
+                $this->setTicket(null);
                 $this->messageManager->addErrorMessage(__('Error: ') . $response->ResultCode . ' - ' . $response->ResultDecription);
                 return false;
             }
@@ -61,5 +64,14 @@ class Redirect extends \Magento\Framework\App\Action\Action
             return false;
         }
 	}
+
+    private function setTicket($ticket)
+    {
+        $order = $this->checkoutSession->getLastRealOrder();
+        $additionalInfo = $order->getPayment()->getAdditionalInformation();
+        $additionalInfo['ticket'] = $ticket;
+        $order->getPayment()->setAdditionalInformation($additionalInfo);
+        $this->orderRepository->save($order);
+    }
 
 }
