@@ -55,6 +55,7 @@ class Failure extends \Magento\Framework\App\Action\Action implements CsrfAwareA
                 if ($postData['ResponseCode'] != 0) $result .= $postData['ResponseCode'] . ' - ' . $postData['ResponseDescription'];
                 $order->addCommentToStatusHistory('Payment Failure:' . $result. '. Transaction Id: ' . $postData['TransactionId']);
                 $this->orderRepository->save($order);
+                $this->messageManager->addErrorMessage(__('Payment Failed') );
                 $this->_redirect('checkout/onepage/failure');
             } else {
                 $this->_redirect('/');
