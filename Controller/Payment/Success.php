@@ -2,11 +2,12 @@
 
 namespace Natso\Piraeus\Controller\Payment;
 
+use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\App\CsrfAwareActionInterface;
 use Magento\Framework\App\Request\InvalidRequestException;
 use Magento\Framework\App\RequestInterface;
 
-class Success extends \Magento\Framework\App\Action\Action implements CsrfAwareActionInterface
+class Success extends \Magento\Framework\App\Action\Action implements CsrfAwareActionInterface, HttpPostActionInterface
 {
     public $context;
     protected $_checkoutSession;
@@ -15,6 +16,7 @@ class Success extends \Magento\Framework\App\Action\Action implements CsrfAwareA
     protected $orderRepository;
     protected $_transaction;
     protected $_helper;
+    protected $winbankLogger;
     protected $logger;
 
     public function __construct(
@@ -25,6 +27,7 @@ class Success extends \Magento\Framework\App\Action\Action implements CsrfAwareA
         \Magento\Sales\Api\OrderRepositoryInterface $orderRepository,
         \Magento\Framework\DB\Transaction $_transaction,
         \Natso\Piraeus\Helper\Data $_helper,
+        \Psr\Log\LoggerInterface $winbankLogger,
         \Psr\Log\LoggerInterface $logger
     ) {
         $this->_checkoutSession = $checkoutSession;
@@ -33,6 +36,7 @@ class Success extends \Magento\Framework\App\Action\Action implements CsrfAwareA
         $this->orderFactory = $orderFactory;
         $this->orderRepository = $orderRepository;
         $this->_helper = $_helper;
+        $this->winbankLogger = $winbankLogger;
         $this->logger = $logger;
         $this->context = $context;
         parent::__construct($context);
@@ -51,46 +55,53 @@ class Success extends \Magento\Framework\App\Action\Action implements CsrfAwareA
     public function execute()
     {
         try {
-            $postData = $this->getRequest()->getPostValue();
-            if (!empty($postData) && isset($postData['MerchantReference']) && 
-                isset($postData['TransactionId']))
-            {
-                $order = $this->orderFactory->create();
-                $order->loadByIncrementId($postData['MerchantReference']);
-                if ($this->_helper->isValidResponse($order, $postData)) {
+            $postData = $this->getRequest()->getParams();
+            $this->winbankLogger->info('Piraeus Bank Payment Success: Post Data: ' . print_r($postData, true));
 
-                    $order->setState(\Magento\Sales\Model\Order::STATE_PROCESSING, true);
-                    $order->setStatus(\Magento\Sales\Model\Order::STATE_PROCESSING);
-                    $order->addStatusToHistory($order->getStatus(), 'Success Payment. Transaction Id: ' . $postData['TransactionId']);
-                    $this->orderRepository->save($order);
+            if($postData['ResultCode'] == 0 && $postData['StatusFlag'] == 'Success') {
+                if (isset($postData['MerchantReference']) && isset($postData['TransactionId'])) {
+                    $order = $this->orderFactory->create();
+                    $order->loadByIncrementId($postData['MerchantReference']);
+                    if ($this->_helper->isValidResponse($order, $postData)) {
 
-                    if ($order->canInvoice()) {
-                        $invoice = $this->_invoiceService->prepareInvoice($order);
-                        $invoice->register();
-                        $this->_transaction
-                                ->addObject($invoice)
-                                ->addObject($order)
-                                ->save();
-                        $order->addCommentToStatusHistory(__('Invoiced', $invoice->getId()))->setIsCustomerNotified(false);
+                        $order->setState(\Magento\Sales\Model\Order::STATE_PROCESSING, true);
+                        $order->setStatus(\Magento\Sales\Model\Order::STATE_PROCESSING);
+                        $order->addCommentToStatusHistory('Success Payment. Transaction Id: ' . $postData['TransactionId']);
+                        $this->orderRepository->save($order);
+
+                        if ($order->canInvoice()) {
+                            $invoice = $this->_invoiceService->prepareInvoice($order);
+                            $invoice->register();
+                            $this->_transaction
+                                    ->addObject($invoice)
+                                    ->addObject($order)
+                                    ->save();
+                            $order->addCommentToStatusHistory(__('Invoiced', $invoice->getId()))->setIsCustomerNotified(false);
+                            $this->orderRepository->save($order);
+                        }
+                        // add order information to the session
+                        $this->_checkoutSession
+                            ->setLastOrderId($order->getId())             
+                            ->setLastRealOrderId($order->getIncrementId())
+                            ->setLastOrderStatus($order->getStatus());
+                        $this->_checkoutSession->setLastQuoteId($order->getQuoteId());
+                        $this->_checkoutSession->setLastSuccessQuoteId($order->getQuoteId());
+                        
+                        $this->_redirect('checkout/onepage/success', ['_secure' => true]);
+                        return;
+                    }
+                    else {
+                        $order->addCommentToStatusHistory('Invalid response from Piraeus Bank. Transaction Id: ' . $postData['TransactionId']);
                         $this->orderRepository->save($order);
                     }
-                    // add order information to the session
-                    $this->_checkoutSession
-                        ->setLastOrderId($order->getId())             
-                        ->setLastRealOrderId($order->getIncrementId())
-                        ->setLastOrderStatus($order->getStatus());
-                    $this->_checkoutSession->setLastQuoteId($order->getQuoteId());
-                    $this->_checkoutSession->setLastSuccessQuoteId($order->getQuoteId());
-                    
-                    $this->_redirect('checkout/onepage/success', ['_secure' => true]);
-                    return;
                 }
-                else {
-                    $order->addStatusToHistory($order->getStatus(), 'Invalid response from Piraeus Bank. Transaction Id: ' . $postData['TransactionId']);
-                    $this->orderRepository->save($order);
-                }
+                $this->logger->error('Piraeus Bank Payment Success: Invalid Post Data');
+            } else {
+                $this->logger->debug('Piraeus Bank Payment Success: Got failure response in success url', $postData);
+                $this->_redirect('winbank/payment/failure');
+                $this->getResponse()->setHttpResponseCode(307);
+                return;
             }
-            $this->logger->error('Piraeus Bank Payment Success: Invalid Post Data');
         } catch (\Exception $e) {
             $this->logger->error('Piraeus Bank Payment Success: Exception: ' . $e->getMessage());
         }

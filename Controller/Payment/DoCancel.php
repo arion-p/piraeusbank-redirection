@@ -50,12 +50,8 @@ class DoCancel extends \Magento\Framework\App\Action\Action implements CsrfAware
                 $order = $this->orderFactory->create();
                 $order->loadByIncrementId($this->checkoutSession->getLastRealOrderId());
                 $order->cancel();
-                //$order->setState(\Magento\Sales\Model\Order::STATE_CANCELED, true);
                 $order->setStatus(\Magento\Sales\Model\Order::STATE_CANCELED);
-                // foreach ($order->getAllItems() as $item) { // Cancel order items
-                //     $item->cancel();
-                // }
-                $order->addStatusToHistory($order->getStatus(), 'Payment canceled from client after redirect.');
+                $order->addCommentToStatusHistory('Payment canceled from client after redirect.');
                 $this->orderRepository->save($order);
                 $this->messageManager->addErrorMessage(__('Payment canceled by user.'));
                 $this->checkoutSession->restoreQuote();
