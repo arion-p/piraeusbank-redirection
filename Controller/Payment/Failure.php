@@ -12,6 +12,7 @@ class Failure extends \Magento\Framework\App\Action\Action implements CsrfAwareA
     public $context;
     protected $orderFactory;
     protected $orderRepository;
+    protected $checkoutSession;
     protected $winbankLogger;
     protected $logger;
 
@@ -19,12 +20,14 @@ class Failure extends \Magento\Framework\App\Action\Action implements CsrfAwareA
         \Magento\Framework\App\Action\Context $context,
         \Magento\Sales\Model\OrderFactory $orderFactory,
         \Magento\Sales\Api\OrderRepositoryInterface $orderRepository,
+        \Magento\Checkout\Model\Session $checkoutSession,
         \Psr\Log\LoggerInterface $winbankLogger,
         \Psr\Log\LoggerInterface $logger,
     ) {
         $this->context = $context;
         $this->orderFactory = $orderFactory;
         $this->orderRepository = $orderRepository;
+        $this->checkoutSession = $checkoutSession;
         $this->winbankLogger = $winbankLogger;
         $this->logger = $logger;
         parent::__construct($context);
@@ -56,6 +59,8 @@ class Failure extends \Magento\Framework\App\Action\Action implements CsrfAwareA
                 $order->addCommentToStatusHistory('Payment Failure:' . $result. '. Transaction Id: ' . $postData['TransactionId']);
                 $this->orderRepository->save($order);
                 $this->messageManager->addErrorMessage(__('Payment Failed') );
+                $this->checkoutSession->setLastRealOrderId($postData['MerchantReference']);
+                $this->checkoutSession->restoreQuote();
                 $this->_redirect('checkout/onepage/failure');
             } else {
                 $this->_redirect('/');
