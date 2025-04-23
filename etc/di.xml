@@ -12,6 +12,8 @@
                 <item name="info" xsi:type="object">Natso\Piraeus\Model\Log\Handler</item>
                 <item name="error" xsi:type="object">Natso\Piraeus\Model\Log\Handler</item>
                 <item name="warn" xsi:type="object">Natso\Piraeus\Model\Log\Handler</item>
+                <item name="debug" xsi:type="object">Natso\Piraeus\Model\Log\Handler</item>
+                <item name="system" xsi:type="object">Natso\Piraeus\Model\Log\Handler</item>
             </argument>
         </arguments>
     </virtualType>
